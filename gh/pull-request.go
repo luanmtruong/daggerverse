@@ -222,6 +222,65 @@ func (m *PullRequest) Review(
 	}
 }
 
+// List pull requests on GitHub.
+func (m *PullRequest) List(
+	ctx context.Context,
+
+	// Limit the number of pull requests to list.
+	//
+	// +optional
+	limit int,
+
+	// Filter by pull request state: {open|closed|merged|all}.
+	//
+	// +optional
+	state string,
+
+	// Filter by pull request base branch.
+	//
+	// +optional
+	baseBranch string,
+
+	// filter by head branch.
+	//
+	// +optional
+	headBranch string,
+
+	// GitHub token.
+	//
+	// +optional
+	token *dagger.Secret,
+
+	// GitHub repository (e.g. "owner/repo").
+	//
+	// +optional
+	repo string,
+) (string, error) {
+	ctr := m.Gh.container(token, repo)
+
+	args := []string{"gh", "pr", "list"}
+
+	if limit > 0 {
+		args = append(args, "--limit", fmt.Sprintf("%d", limit))
+	}
+
+	if state != "" {
+		args = append(args, "--state", state)
+	}
+
+	if baseBranch != "" {
+		args = append(args, "--base", baseBranch)
+	}
+
+	if headBranch != "" {
+		args = append(args, "--head", headBranch)
+	}
+
+	output, err := ctr.WithExec(args).Stdout(ctx)
+
+	return output, err
+}
+
 // TODO: revisit if these should be private
 type PullRequestReview struct {
 	// +private
