@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 )
 
 // Work with GitHub pull requests.
@@ -252,7 +253,7 @@ func (m *PullRequest) List(
 	//
 	// +optional
 	repo string,
-) (int, error) {
+) (string, error) {
 	ctr := m.Gh.container(token, repo)
 
 	args := []string{"gh", "pr", "list", "--json", "number", "--limit", "1"}
@@ -271,21 +272,21 @@ func (m *PullRequest) List(
 
 	output, err := ctr.WithExec(args).Stdout(ctx)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	var prList []struct {
-		Number int `json:"number"`
+		Number int
 	}
 	if err := json.Unmarshal([]byte(output), &prList); err != nil {
-		return 0, fmt.Errorf("failed to parse PR list: %w", err)
+		return "", fmt.Errorf("failed to parse PR list: %w", err)
 	}
 
 	if len(prList) == 0 {
-		return 0, fmt.Errorf("no pull requests found")
+		return "", fmt.Errorf("no pull requests found")
 	}
 
-	return prList[0].Number, nil
+	return strconv.Itoa(prList[0].Number), nil
 }
 
 // Update an existing pull request on GitHub.
