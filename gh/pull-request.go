@@ -228,11 +228,6 @@ func (m *PullRequest) Review(
 func (m *PullRequest) List(
 	ctx context.Context,
 
-	// Limit the number of pull requests to list.
-	//
-	// +optional
-	limit int,
-
 	// Filter by pull request state: {open|closed|merged|all}.
 	//
 	// +optional
@@ -241,12 +236,12 @@ func (m *PullRequest) List(
 	// Filter by pull request base branch.
 	//
 	// +optional
-	baseBranch string,
+	base string,
 
 	// filter by head branch.
 	//
 	// +optional
-	headBranch string,
+	head string,
 
 	// GitHub token.
 	//
@@ -257,45 +252,40 @@ func (m *PullRequest) List(
 	//
 	// +optional
 	repo string,
-) ([]int, error) {
+) (int, error) {
 	ctr := m.Gh.container(token, repo)
 
-	args := []string{"gh", "pr", "list", "--json", "number"}
-
-	if limit > 0 {
-		args = append(args, "--limit", fmt.Sprintf("%d", limit))
-	}
+	args := []string{"gh", "pr", "list", "--json", "number", "--limit", "1"}
 
 	if state != "" {
 		args = append(args, "--state", state)
 	}
 
-	if baseBranch != "" {
-		args = append(args, "--base", baseBranch)
+	if base != "" {
+		args = append(args, "--base", base)
 	}
 
-	if headBranch != "" {
-		args = append(args, "--head", headBranch)
+	if head != "" {
+		args = append(args, "--head", head)
 	}
 
 	output, err := ctr.WithExec(args).Stdout(ctx)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
 
 	var prList []struct {
 		Number int `json:"number"`
 	}
 	if err := json.Unmarshal([]byte(output), &prList); err != nil {
-		return nil, fmt.Errorf("failed to parse PR list: %w", err)
+		return 0, fmt.Errorf("failed to parse PR list: %w", err)
 	}
 
-	prNumbers := make([]int, len(prList))
-	for i, pr := range prList {
-		prNumbers[i] = pr.Number
+	if len(prList) == 0 {
+		return 0, fmt.Errorf("no pull requests found")
 	}
 
-	return prNumbers, nil
+	return prList[0].Number, nil
 }
 
 // Update an existing pull request on GitHub.
