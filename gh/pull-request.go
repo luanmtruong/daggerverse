@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"dagger/gh/internal/dagger"
+	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 // Work with GitHub pull requests.
@@ -255,10 +257,10 @@ func (m *PullRequest) List(
 	//
 	// +optional
 	repo string,
-) (string, error) {
+) ([]int, error) {
 	ctr := m.Gh.container(token, repo)
 
-	args := []string{"gh", "pr", "list"}
+	args := []string{"gh", "pr", "list", "--json", "number"}
 
 	if limit > 0 {
 		args = append(args, "--limit", fmt.Sprintf("%d", limit))
@@ -277,8 +279,131 @@ func (m *PullRequest) List(
 	}
 
 	output, err := ctr.WithExec(args).Stdout(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	return output, err
+	var prList []struct {
+		Number int `json:"number"`
+	}
+	if err := json.Unmarshal([]byte(output), &prList); err != nil {
+		return nil, fmt.Errorf("failed to parse PR list: %w", err)
+	}
+
+	prNumbers := make([]int, len(prList))
+	for i, pr := range prList {
+		prNumbers[i] = pr.Number
+	}
+
+	return prNumbers, nil
+}
+
+// Update an existing pull request on GitHub.
+func (m *PullRequest) Update(
+	ctx context.Context,
+
+	// Pull request number to update.
+	prNumber int,
+
+	// Assign people by their login. Use "@me" to self-assign.
+	//
+	// +optional
+	assignees []string,
+
+	// The branch into which you want your code merged.
+	//
+	// +optional
+	base string,
+
+	// Body for the pull request.
+	//
+	// +optional
+	body string,
+
+	// Read body text from file.
+	//
+	// +optional
+	bodyFile *dagger.File,
+
+	// Add labels by name.
+	//
+	// +optional
+	labels []string,
+
+	// Add the pull request to a milestone by name.
+	//
+	// +optional
+	milestone string,
+
+	// Add the pull request to projects by name.
+	//
+	// +optional
+	projects []string,
+
+	// Request reviews from people or teams by their handle.
+	//
+	// +optional
+	reviewers []string,
+
+	// Title for the pull request.
+	//
+	// +optional
+	title string,
+
+	// GitHub token.
+	//
+	// +optional
+	token *dagger.Secret,
+
+	// GitHub repository (e.g. "owner/repo").
+	//
+	// +optional
+	repo string,
+) error {
+	ctr := m.Gh.container(token, repo)
+
+	args := []string{"gh", "pr", "edit", fmt.Sprintf("%d", prNumber)}
+
+	for _, assignee := range assignees {
+		args = append(args, "--add-assignee", assignee)
+	}
+
+	if base != "" {
+		args = append(args, "--base", base)
+	}
+
+	if body != "" {
+		args = append(args, "--body", body)
+	}
+
+	if bodyFile != nil {
+		ctr = ctr.WithMountedFile("/work/tmp/body", bodyFile)
+		args = append(args, "--body-file", "/work/tmp/body")
+	}
+
+	for _, label := range labels {
+		args = append(args, "--add-label", label)
+	}
+
+	if milestone != "" {
+		args = append(args, "--milestone", milestone)
+	}
+
+	for _, project := range projects {
+		args = append(args, "--add-project", project)
+	}
+
+	for _, reviewer := range reviewers {
+		args = append(args, "--add-reviewer", reviewer)
+	}
+
+	if title != "" {
+		args = append(args, "--title", title)
+	}
+
+	_, err := ctr.WithExec(args).Sync(ctx)
+
+	return err
 }
 
 // TODO: revisit if these should be private
