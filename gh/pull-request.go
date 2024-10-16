@@ -353,7 +353,7 @@ func (m *PullRequest) Update(
 ) error {
 	ctr := m.Gh.container(token, repo)
 
-	args := []string{"gh", "pr", "edit", fmt.Sprintf("%d", pullRequest)}
+	args := []string{"gh", "pr", "edit", pullRequest}
 
 	for _, assignee := range assignees {
 		args = append(args, "--add-assignee", assignee)
