@@ -294,7 +294,7 @@ func (m *PullRequest) Update(
 	ctx context.Context,
 
 	// Pull request number to update.
-	prNumber int,
+	pullRequest string,
 
 	// Assign people by their login. Use "@me" to self-assign.
 	//
@@ -353,7 +353,7 @@ func (m *PullRequest) Update(
 ) error {
 	ctr := m.Gh.container(token, repo)
 
-	args := []string{"gh", "pr", "edit", fmt.Sprintf("%d", prNumber)}
+	args := []string{"gh", "pr", "edit", fmt.Sprintf("%d", pullRequest)}
 
 	for _, assignee := range assignees {
 		args = append(args, "--add-assignee", assignee)
