@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 )
 
@@ -202,6 +203,52 @@ func (m *PullRequest) Create(
 	return err
 }
 
+// Close a pull request on GitHub.
+func (m *PullRequest) Close(
+	ctx context.Context,
+
+	// Pull request number to close.
+	//
+	// +optional
+	pullRequest string,
+
+	// Add a comment when closing the pull request.
+	//
+	// +optional
+	comment string,
+
+	// Delete the local and remote branch after closing.
+	//
+	// +optional
+	deleteBranch bool,
+
+	// GitHub token.
+	//
+	// +optional
+	token *dagger.Secret,
+
+	// GitHub repository (e.g. "owner/repo").
+	//
+	// +optional
+	repo string,
+) error {
+	ctr := m.Gh.container(token, repo)
+
+	args := []string{"gh", "pr", "close", pullRequest}
+
+	if comment != "" {
+		args = append(args, "--comment", comment)
+	}
+
+	if deleteBranch {
+		args = append(args, "--delete-branch")
+	}
+
+	_, err := ctr.WithExec(args).Sync(ctx)
+
+	return err
+}
+
 // Add a review to a pull request.
 func (m *PullRequest) Review(
 	// Pull request number, url or branch name.
@@ -225,7 +272,6 @@ func (m *PullRequest) Review(
 	}
 }
 
-// List pull requests on GitHub.
 func (m *PullRequest) List(
 	ctx context.Context,
 
@@ -239,10 +285,15 @@ func (m *PullRequest) List(
 	// +optional
 	base string,
 
-	// filter by head branch.
+	// Filter by head branch.
 	//
 	// +optional
 	head string,
+
+	// Filter by head branch using regex pattern.
+	//
+	// +optional
+	headRegex string,
 
 	// GitHub token.
 	//
@@ -256,7 +307,7 @@ func (m *PullRequest) List(
 ) (string, error) {
 	ctr := m.Gh.container(token, repo)
 
-	args := []string{"gh", "pr", "list", "--json", "number", "--limit", "1"}
+	args := []string{"gh", "pr", "list", "--json", "number,headRefName", "--limit", "1000"}
 
 	if state != "" {
 		args = append(args, "--state", state)
@@ -276,10 +327,25 @@ func (m *PullRequest) List(
 	}
 
 	var prList []struct {
-		Number int
+		Number      int    `json:"number"`
+		HeadRefName string `json:"headRefName"`
 	}
 	if err := json.Unmarshal([]byte(output), &prList); err != nil {
 		return "", fmt.Errorf("failed to parse PR list: %w", err)
+	}
+
+	if headRegex != "" {
+		regex, err := regexp.Compile(headRegex)
+		if err != nil {
+			return "", fmt.Errorf("invalid regex pattern: %w", err)
+		}
+
+		for _, pr := range prList {
+			if regex.MatchString(pr.HeadRefName) {
+				return strconv.Itoa(pr.Number), nil
+			}
+		}
+		return "", fmt.Errorf("no pull requests found matching the regex pattern")
 	}
 
 	if len(prList) == 0 {
@@ -294,6 +360,8 @@ func (m *PullRequest) Update(
 	ctx context.Context,
 
 	// Pull request number to update.
+	//
+	// +optional
 	pullRequest string,
 
 	// Assign people by their login. Use "@me" to self-assign.
