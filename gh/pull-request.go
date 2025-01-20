@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // Work with GitHub pull requests.
@@ -212,16 +213,6 @@ func (m *PullRequest) Close(
 	// +optional
 	pullRequest string,
 
-	// Add a comment when closing the pull request.
-	//
-	// +optional
-	comment string,
-
-	// Delete the local and remote branch after closing.
-	//
-	// +optional
-	deleteBranch bool,
-
 	// GitHub token.
 	//
 	// +optional
@@ -231,6 +222,16 @@ func (m *PullRequest) Close(
 	//
 	// +optional
 	repo string,
+
+	// Add a comment when closing the pull request.
+	//
+	// +optional
+	comment string,
+
+	// Delete the local and remote branch after closing.
+	//
+	// +optional
+	deleteBranch bool,
 ) error {
 	ctr := m.Gh.container(token, repo)
 
@@ -247,6 +248,44 @@ func (m *PullRequest) Close(
 	_, err := ctr.WithExec(args).Sync(ctx)
 
 	return err
+}
+
+// Check if a PR exists
+func (m *PullRequest) Exists(
+	ctx context.Context,
+
+	// Pull request number, url or branch name.
+	pullRequest string,
+
+	// GitHub token.
+	//
+	// +optional
+	token *dagger.Secret,
+
+	// GitHub repository (e.g. "owner/repo").
+	//
+	// +optional
+	repo string,
+) (bool, error) {
+	ctr := m.Gh.container(token, repo)
+
+	args := []string{"gh", "pr", "view", pullRequest, "--json", "id"}
+	_, err := ctr.WithExec(args).Sync(ctx)
+	if err != nil {
+		var execErr *dagger.ExecError
+		if errors.As(err, &execErr) {
+			if strings.Contains(strings.ToLower(execErr.Stderr), "no pull requests found") {
+				// error when no pr for a branch
+				return false, nil
+			}
+			if strings.Contains(strings.ToLower(execErr.Stderr), "could not resolve to a pullrequest") {
+				// error when no pr for a pr number or url
+				return false, nil
+			}
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 // Add a review to a pull request.

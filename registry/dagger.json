@@ -1,13 +1,12 @@
 {
   "name": "registry",
+  "engineVersion": "v0.15.2",
   "sdk": "go",
   "exclude": [
     "../.direnv",
     "../.devenv",
     "../go.work",
-    "../go.work.sum",
-    "tests"
+    "../go.work.sum"
   ],
-  "source": ".",
-  "engineVersion": "v0.12.0"
+  "source": "."
 }

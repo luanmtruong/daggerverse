@@ -1,5 +1,6 @@
 {
   "name": "tests",
+  "engineVersion": "v0.15.2",
   "sdk": "go",
   "exclude": [
     "../../.direnv",
@@ -21,6 +22,5 @@
       "source": "../../ssh-keygen"
     }
   ],
-  "source": ".",
-  "engineVersion": "v0.12.0"
+  "source": "."
 }

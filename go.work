@@ -1,4 +1,4 @@
-go 1.22.5
+go 1.23.1
 
 use (
 	./apko
@@ -7,6 +7,8 @@ use (
 	./arc/tests
 	./archivist
 	./archivist/tests
+	./aws-cli
+	./aws-cli/tests
 	./bats
 	./bats/tests
 	./borgo
@@ -32,6 +34,13 @@ use (
 	./openapi-changes/tests
 	./openssh-server
 	./openssh-server/tests
+	./php
+	./php-cs-fixer
+	./php-cs-fixer/tests
+	./php/examples/go
+	./php/tests
+	./phpstan
+	./phpstan/tests
 	./postgres
 	./postgres/tests
 	./psql
@@ -52,6 +61,9 @@ use (
 	./ssh-keygen/tests
 	./stainless
 	./stainless/tests
+	./svix
+	./svix/examples/go
+	./svix/tests
 	./trivy
 	./trivy/examples/go
 	./trivy/tests

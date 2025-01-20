@@ -8,7 +8,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha1"
 	"dagger/postgres/internal/dagger"
 	"fmt"
 	"strings"
@@ -29,6 +28,9 @@ type Postgres struct {
 
 	// +private
 	Container *dagger.Container
+
+	// +private
+	InitScripts *dagger.Directory
 }
 
 func New(
@@ -49,7 +51,7 @@ func New(
 	// +optional
 	user *dagger.Secret,
 
-	// Superuser password. (defaults to a generated password)
+	// Superuser password. (defaults "postgres")
 	//
 	// +optional
 	password *dagger.Secret,
@@ -73,6 +75,11 @@ func New(
 	//
 	// +optional
 	initdbArgs []string,
+
+	// Instance name (allowing to spawn multiple services with the same parameters).
+	//
+	// +optional
+	name string,
 ) (*Postgres, error) {
 	if container == nil {
 		if version == "" {
@@ -87,23 +94,9 @@ func New(
 		user = dag.SetSecret("postgres-default-user", "postgres")
 	}
 
-	// Generate a random password.
+	// Password defaults to "postgres".
 	if password == nil {
-		randomPassword, err := generateRandomPassword(20)
-		if err != nil {
-			return nil, err
-		}
-
-		h := sha1.New()
-
-		_, err = h.Write([]byte(randomPassword))
-		if err != nil {
-			return nil, err
-		}
-
-		name := fmt.Sprintf("postgres-generated-password-%x", h.Sum(nil))
-
-		password = dag.SetSecret(name, randomPassword)
+		password = dag.SetSecret("postgres-default-password", "postgres")
 	}
 
 	// Database defaults to the user name.
@@ -132,6 +125,10 @@ func New(
 		}
 	}
 
+	if initScripts == nil {
+		initScripts = dag.Directory()
+	}
+
 	container = container.
 		WithExposedPort(5432).
 		WithSecretVariable("POSTGRES_USER", user).
@@ -142,12 +139,12 @@ func New(
 				c = c.WithMountedCache(pgdata, dataVolume)
 			}
 
-			if initScripts != nil {
-				c = c.WithMountedDirectory("/docker-entrypoint-initdb.d", initScripts)
-			}
-
 			if len(initdbArgs) > 0 {
 				c = c.WithEnvVariable("POSTGRES_INITDB_ARGS", strings.Join(initdbArgs, " "))
+			}
+
+			if name != "" {
+				c = c.WithLabel("io.dagger.postgres.instance", name)
 			}
 
 			return c
@@ -158,11 +155,47 @@ func New(
 		Password: password,
 		Database: database,
 
-		Container: container,
+		Container:   container,
+		InitScripts: initScripts,
 	}, nil
+}
+
+func (m *Postgres) container() *dagger.Container {
+	return m.Container.
+		WithMountedDirectory("/docker-entrypoint-initdb.d", m.InitScripts)
+}
+
+// Add an additional initialization script to run when the service first starts.
+func (m *Postgres) WithInitScript(file *dagger.File) *Postgres {
+	m.InitScripts = m.InitScripts.WithFile("", file)
+
+	return m
+}
+
+// Creates an additional database with the given name (with the default user as the owner) when the service first starts.
+//
+// Under the hood, this method adds a SQL script to the init scripts that creates the database.
+func (m *Postgres) WithDatabase(
+	ctx context.Context,
+
+	// Database to create.
+	name string,
+) (*Postgres, error) {
+	user, err := m.User.Plaintext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sql := fmt.Sprintf(`CREATE DATABASE %s; GRANT ALL PRIVILEGES ON DATABASE %s TO %s;`, name, name, user)
+
+	m.InitScripts = m.InitScripts.WithNewFile(fmt.Sprintf("create-database-%s.sql", name), sql)
+
+	return m, nil
 }
 
 // The Postgres service.
 func (m *Postgres) Service() *dagger.Service {
-	return m.Container.AsService()
+	return m.container().AsService(dagger.ContainerAsServiceOpts{
+		UseEntrypoint: true,
+	})
 }
