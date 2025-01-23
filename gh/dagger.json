@@ -10,8 +10,9 @@
   ],
   "dependencies": [
     {
-      "name": "apko",
-      "source": "../apko"
+      "name": "wolfi",
+      "source": "github.com/dagger/dagger/modules/wolfi@67a4a03355f1381c0ac0963db43a724c359ac6c1",
+      "pin": "67a4a03355f1381c0ac0963db43a724c359ac6c1"
     }
   ],
   "source": "."

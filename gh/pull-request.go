@@ -208,7 +208,7 @@ func (m *PullRequest) Create(
 func (m *PullRequest) Close(
 	ctx context.Context,
 
-	// Pull request number to close.
+	// Pull request number, url or branch name.
 	//
 	// +optional
 	pullRequest string,

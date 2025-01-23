@@ -167,14 +167,13 @@ func (m *Gh) Terminal(
 }
 
 func (m *Gh) base() *dagger.Container {
-	return dag.
-		Apko().
-		Wolfi().
-		WithPackages([]string{
+	return dag.Wolfi().
+		Container(dagger.WolfiContainerOpts{
+			Packages: []string{
 			"gh",
 			"git",
+			},
 		}).
-		Container().
 		WithEnvVariable("GH_PROMPT_DISABLED", "true").
 		WithEnvVariable("GH_NO_UPDATE_NOTIFIER", "true").
 		WithExec([]string{"gh", "auth", "setup-git", "--force", "--hostname", "github.com"}) // Use force to avoid network call and cache setup even when no token is provided.
